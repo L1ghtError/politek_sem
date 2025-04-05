@@ -6,13 +6,13 @@
 #include "vars/mpi_var_print.h"
 #include "vars/mpi_vars.h"
 
-#define ENABLE_LOGS 0
-
+#define ENABLE_INTERMIDIATE_LOGS 0
+#define DUMP_TO_FILE 1
 int main() {
-    const int enable_logs = ENABLE_LOGS;
-    MpiVars_t *var = NewMpiVars(100);
+    const int enable_logs = ENABLE_INTERMIDIATE_LOGS;
+    MpiVars_t *var = NewMpiVars(DEFAULT_DIMS);
     MpiVars_Fill(var, MPI_INPUT_LINEAR);
-    int is_file = 0;
+    int is_file = DUMP_TO_FILE;
     FILE *fd = stdout;
     if (is_file) {
         fd = fopen("single_thread_dump.txt", "w");
@@ -129,10 +129,10 @@ int main() {
     if (res != 0) {
         return res;
     }
-    if (enable_logs)
-        fd_print_header_ex(
-            fd, "(Y3 * y2 * y2` + Y3^3 - Y3 + y2 * y1`) +  (Y3^2 * y1 * y1`):",
-            gamma_m);
+
+    fd_print_header_ex(
+        fd, "(Y3 * y2 * y2` + Y3^3 - Y3 + y2 * y1`) +  (Y3^2 * y1 * y1`):",
+        gamma_m);
 
     if (is_file) {
         fclose(fd);

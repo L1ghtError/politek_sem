@@ -3,6 +3,10 @@
 #include "payload/mpi_payload.h"
 #include "stdlib.h" // malloc
 
+// just a fancy macro for default size
+// can be changed on demand
+#define DEFAULT_DIMS 50
+
 struct MpiVars {
     // Initial
     payload_matrix A;  // Random or input
@@ -34,7 +38,7 @@ inline int sizeofMpiVars(const MpiVars_t *mpvars) {
     const size_t payload_size = sizeof(payload);
     return mpvars->total_cont_size * payload_size;
 }
-
+// works ONLY with pointer that was allocated with `NewMpiVars`
 void UpdateAddresses(MpiVars_t *ptr) {
     if (ptr == NULL) {
         return;

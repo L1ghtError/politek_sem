@@ -8,8 +8,19 @@
 #include "vars/mpi_vars.h"
 volatile int log_lvl = -1;
 
+// logs with this level will be hidden if `log_lvl` is greater than 1
 #define LOG_LVL_INFO 1
+// same as `LOG_LVL_INFO` but for `log_lvl` > 10
 #define LOG_LVL_CRIT 10
+
+int check_op(int argc, char *argv[], const char *flag) {
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], flag) == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
 
 void log_header(int lvl, FILE *fd, const char *title,
                 const paylaod_header_t *header) {
@@ -36,14 +47,15 @@ int mpi_crash(FILE *fd, char const *const reason) {
 // (Y3 * y2) * y2`
 #define tag_Y3muly2muly2t 5
 // Y3^3
-#define tag_Y3pow3 6
+#define tag_Y3pow3subY3 6
 
+// Program options
 struct prog_ops {
     int payload_size; // size of matrices or vectors
     int is_file_dump; // print to console or to file ?
     int is_verbose;   // print intermidiate states ?
-    mpi_input_type_t input_type;
-    FILE *dump_fd;
+    mpi_input_type_t input_type; // Linear, Manual, Random
+    FILE *dump_fd; // exact place where to store calculations
 };
 typedef struct prog_ops prog_ops_t;
 
@@ -53,6 +65,7 @@ void PROC_0(prog_ops_t ops) {
     MPI_Status status;
     MpiVars_t *var = NewMpiVars(ops.payload_size);
     paylaod_header_t *tmp_mat = new_payload(var->N, var->N);
+    paylaod_header_t *tmp_mat_1 = new_payload(var->N, var->N);
     paylaod_header_t *tmp_mat_2 = new_payload(var->N, var->N);
     paylaod_header_t *tmp_mat_3 = new_payload(var->N, var->N);
     paylaod_header_t *tmp_mat_4 = new_payload(var->N, var->N);
@@ -105,29 +118,22 @@ void PROC_0(prog_ops_t ops) {
     MPI_Recv(tmp_mat_3->ptr, var->N * var->N, MPI_PLD_TYPE, 1,
              tag_Y3muly2muly2t, MPI_COMM_WORLD, &status);
 
-    MPI_Recv(tmp_mat_4->ptr, var->N * var->N, MPI_PLD_TYPE, 2, tag_Y3pow3,
+    MPI_Recv(tmp_mat_4->ptr, var->N * var->N, MPI_PLD_TYPE, 2, tag_Y3pow3subY3,
              MPI_COMM_WORLD, &status);
 
-    //   (Y3 * y2 * y2`) + (Y3^3)
-    res = payload_matrix_add(tmp_mat_3, tmp_mat_4, tmp_mat);
+    //   (Y3 * y2 * y2`) + (Y3^3 - Y3)
+    res = payload_matrix_add(tmp_mat_3, tmp_mat_4, tmp_mat_1);
     if (res != 0) {
-        mpi_crash(ops.dump_fd, "(Y3 * y2 * y2`) + (Y3^3) failed");
+        mpi_crash(ops.dump_fd, "(Y3 * y2 * y2`) + (Y3^3 - Y3) failed");
     }
-    log_header(LOG_LVL_INFO, ops.dump_fd, "(Y3 * y2 * y2`) + (Y3^3)", tmp_mat);
-
-    //   (Y3 * y2 * y2` + Y3^3) - Y3
-    res = payload_matrix_sub(tmp_mat, &Y3_header, tmp_mat_3);
-    if (res != 0) {
-        mpi_crash(ops.dump_fd, "(Y3 * y2 * y2` + Y3^3) - Y3 failed");
-    }
-    log_header(LOG_LVL_INFO, ops.dump_fd, "(Y3 * y2 * y2` + Y3^3) - Y3",
-               tmp_mat_3);
+    log_header(LOG_LVL_INFO, ops.dump_fd, "(Y3 * y2 * y2`) + (Y3^3 - Y3)",
+               tmp_mat);
 
     MPI_Recv(tmp_mat_4->ptr, var->N * var->N, MPI_PLD_TYPE, 2, tag_y2muly1t,
              MPI_COMM_WORLD, &status);
 
     //   (Y3 * y2 * y2` + Y3^3 - Y3) + (y2 * y1`)
-    res = payload_matrix_add(tmp_mat_3, tmp_mat_4, tmp_mat);
+    res = payload_matrix_add(tmp_mat_1, tmp_mat_4, tmp_mat);
     if (res != 0) {
         mpi_crash(ops.dump_fd,
                   "(Y3 * y2 * y2` + Y3^3 - Y3) + (y2 * y1`) failed");
@@ -189,7 +195,7 @@ void PROC_1(prog_ops_t ops) {
 }
 void PROC_2(prog_ops_t ops) {
     MPI_Status status;
-    MPI_Request Y3pow3_req;
+    MPI_Request Y3pow3subY3_req;
 
     MpiVars_t *var = NewMpiVars(ops.payload_size);
     paylaod_header_t *tmp_mat = new_payload(var->N, var->N);
@@ -220,8 +226,14 @@ void PROC_2(prog_ops_t ops) {
         mpi_crash(ops.dump_fd, "Y3^3 failed");
     }
     log_header(LOG_LVL_INFO, ops.dump_fd, "Y3^3", tmp_mat_2);
-    MPI_Isend(tmp_mat_2->ptr, var->N * var->N, MPI_PLD_TYPE, 0, tag_Y3pow3,
-              MPI_COMM_WORLD, &Y3pow3_req);
+    // (Y3^3) - Y3
+    res = payload_matrix_sub(tmp_mat_2, &Y3_header, tmp_mat);
+    if (res != 0) {
+        mpi_crash(ops.dump_fd, "(Y3^3) - Y3 failed");
+    }
+    log_header(LOG_LVL_INFO, ops.dump_fd, "(Y3^3) - Y3", tmp_mat);
+    MPI_Isend(tmp_mat->ptr, var->N * var->N, MPI_PLD_TYPE, 0, tag_Y3pow3subY3,
+              MPI_COMM_WORLD, &Y3pow3subY3_req);
 
     MPI_Recv(var->y2, var->N, MPI_PLD_TYPE, 1, tag_y2, MPI_COMM_WORLD, &status);
     paylaod_header_t y2_header = {var->y2, 1, var->N};
@@ -240,7 +252,7 @@ void PROC_2(prog_ops_t ops) {
     MPI_Send(tmp_mat->ptr, tmp_mat->h * tmp_mat->w, MPI_PLD_TYPE, 0,
              tag_y2muly1t, MPI_COMM_WORLD);
 
-    MPI_Wait(&Y3pow3_req, MPI_STATUS_IGNORE);
+    MPI_Wait(&Y3pow3subY3_req, MPI_STATUS_IGNORE);
     return;
 }
 
@@ -261,13 +273,12 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    prog_ops_t ops = {100, 1, 1, MPI_INPUT_LINEAR};
-    int fast_flag = 0;
-    for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "-fast") == 0) {
-            fast_flag = 1;
-        }
-    }
+    // skip io, saves only result
+    int trunc_flag = check_op(argc, argv, "-trunc");
+    prog_ops_t ops = {DEFAULT_DIMS, 1, !trunc_flag, MPI_INPUT_LINEAR};
+    // skip user input
+    int fast_flag = check_op(argc, argv, "-fast");
+
     if (rank == 0 && fast_flag == 0) {
 
         printf("Enter payload size (int): ");

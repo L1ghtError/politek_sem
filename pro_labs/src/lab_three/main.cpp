@@ -2,7 +2,7 @@
 #include <iostream>
 #include <random>
 #include <vector>
-#define N 8
+#define N 4
 using namespace std;
 
 void displayArray(vector<vector<int>> x, int n);

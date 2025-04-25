@@ -3,8 +3,15 @@ import psutil
 import datetime
 import signal
 import matplotlib.pyplot as plt
+import argparse
 from datetime import timedelta
 import os
+
+parser = argparse.ArgumentParser(description="Command line arguments for script")
+parser.add_argument('--updateFreq', type=float, default=2, help="Frequency of updates (default: 2)")
+parser.add_argument('--updateTimes', type=int, default=30, help="Number of update times (default: 30)")
+parser.add_argument('--skipDisplay', type=bool, default=False, help="Skip display flag (default: False)")
+args = parser.parse_args()
 
 if not os.path.exists('system.diagnostics.json'):
     open('system.diagnostics.json', 'w').close()
@@ -67,7 +74,19 @@ def accumulate_stats(freq, times):
         'is_success': True
     })
     return diagnostics_table.all()
-data = accumulate_stats(2, 30)
+# Default
+updateFreq = args.updateFreq
+updateTimes = args.updateTimes
+skipDisplay = args.skipDisplay
+
+if skipDisplay == True:
+    stats_table.truncate()  # Clears all data in stats table
+    diagnostics_table.truncate()  # Clears all data in diagnostics table
+
+data = accumulate_stats(updateFreq, updateTimes)
+
+if skipDisplay == True:
+    exit(0)
 
 timestamps = [entry['timestamp'] for entry in data]
 cpu_usage = [entry['cpu_usage'] for entry in data]

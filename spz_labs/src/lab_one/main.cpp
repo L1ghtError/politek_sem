@@ -26,17 +26,21 @@ DWORD WINAPI reverseArray(LPVOID lpParam) {
 }
 int main() {
     int n;
-    printf("Enter the size of the array: ");
+    printf("Enter the size of the maxrix: ");
     scanf_s("%d", &n);
+    int half = n;
+    n *= n;
     // Генерування динамічного масиву з випадковими значеннями
     int *dynamicArray = (int *)malloc(n * sizeof(int));
     for (int i = 0; i < n; i++) {
         dynamicArray[i] = rand() % 100; // Випадкові значення від 0 до 99
     }
     // Виведення початкового масиву
-    printf("\nOriginal array:\n");
+    printf("\nOriginal matrix:\n");
     for (int i = 0; i < n; i++) {
         printf("%d ", dynamicArray[i]);
+        if (i % half == half - 1)
+            printf("\n");
     }
     printf("\n");
     // Створення структури з аргументами для функції потоку

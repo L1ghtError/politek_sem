@@ -90,12 +90,15 @@ int main() {
         std::string result;
         if (isInteger(str1) || std::stoi(str1) < 0) {
             int size = std::stoi(str1);
-
+            int half = size;
+            size *= size;
             int *dynamicArray = (int *)malloc(size * sizeof(int));
-            std::cout << "array is:";
+            std::cout << "array is:\n";
             for (int i = 0; i < size; i++) {
                 dynamicArray[i] = rand() % 100;
-                std::cout << " " << dynamicArray[i];
+                std::cout << dynamicArray[i] << " ";
+                if (i % half == half - 1)
+                    std::cout << "\n";
             }
             int max = findMax(dynamicArray, size);
             std::cout << "\nmax is: " << max << "\n";
